@@ -4,12 +4,32 @@
     {
       "src": "api/**/*.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "index.html",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "ca63eccfcf11bcd02c1a900196de630f_720w.mp4",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    },
+    {
+      "src": "/scan",
+      "dest": "/api/scan"
+    },
+    {
+      "src": "/packets",
+      "dest": "/api/packets"
+    },
+    {
       "src": "/(.*)",
-      "dest": "/api/index.js"
+      "dest": "/index.html"
     }
   ]
 }
