@@ -1,9 +1,8 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Network Inspector</title>
-  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
   <style>
     body {
@@ -102,6 +101,11 @@
       box-shadow: 0 0 10px rgba(255,0,0,0.5);
     }
 
+    button:disabled {
+      background: #666;
+      cursor: not-allowed;
+    }
+
     h1, h2 {
       text-shadow: 0 0 10px rgba(0,255,42,0.5);
     }
@@ -110,90 +114,100 @@
 <body>
   <header>
     <h1>🔍 Network Inspector Dashboard</h1>
-    <p>Real-time Network Analysis & Security Monitoring</p>
+    <p>Real-time Network Analysis & Security Monitoring | Powered by Vercel</p>
   </header>
 
   <main>
     <section>
       <h2>📡 Connected Devices</h2>
-      <button onclick="fetchDevices()">🔄 Scan Network</button>
-      <ul id="device-list"></ul>
+      <button id="scanBtn" onclick="fetchDevices()">🔄 Scan Network</button>
+      <ul id="device-list">
+        <li>Click "Scan Network" to discover devices...</li>
+      </ul>
     </section>
 
     <section>
       <h2>📊 Live Network Activity</h2>
-      <div id="log-container">[ Connected to backend... ]</div>
+      <div id="log-container">[ Initializing Network Inspector... ]</div>
     </section>
 
     <section>
       <h2>🌐 Network Topology</h2>
-      <div id="network"></div>
+      <div id="network">Scan network to visualize topology</div>
     </section>
 
     <section>
       <h2>📶 Current Connection</h2>
-      <div id="wifi-info">Loading network details...</div>
+      <div id="wifi-info">Loading...</div>
     </section>
   </main>
 
   <footer>
-    <p>© 2025 Network Inspector | Powered by Vercel Backend</p>
+    <p>© 2025 Network Inspector | Real Backend Scanning</p>
   </footer>
 
   <script>
-    const socket = io();
     const logContainer = document.getElementById("log-container");
     const deviceList = document.getElementById("device-list");
     const wifiInfo = document.getElementById("wifi-info");
+    const networkDiv = document.getElementById("network");
     let scanning = false;
 
-    socket.on("connect", () => {
-      logContainer.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ✅ Connected to Network Inspector Backend</div>`;
-      logContainer.scrollTop = logContainer.scrollHeight;
-    });
-
-    socket.on("packet", (data) => {
+    // Log function
+    function log(message) {
       const time = new Date().toLocaleTimeString();
       const entry = document.createElement("div");
-      entry.textContent = `[${time}] ${data}`;
+      entry.textContent = `[${time}] ${message}`;
       logContainer.appendChild(entry);
       logContainer.scrollTop = logContainer.scrollHeight;
-    });
+    }
 
-    socket.on("devices", (devices) => {
-      displayDevices(devices);
-    });
-
-    socket.on("topology", (topology) => {
-      drawTopology(topology.nodes, topology.edges);
-    });
-
+    // Real network scan
     async function fetchDevices() {
       if (scanning) return;
       scanning = true;
-      const btn = event.target;
+      const btn = document.getElementById("scanBtn");
       btn.textContent = "⏳ Scanning...";
       btn.disabled = true;
       
-      socket.emit("scan-network");
+      log("🚀 Starting real network scan...");
+      
+      try {
+        const response = await fetch('/api/scan');
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        
+        const data = await response.json();
+        displayDevices(data.devices);
+        drawTopology(data.topology.nodes, data.topology.edges);
+        log(`✅ Scan complete: ${data.devices.length} devices discovered`);
+      } catch (error) {
+        log(`❌ Scan failed: ${error.message}`);
+        deviceList.innerHTML = '<li style="color:red;">Scan failed - check backend</li>';
+      } finally {
+        btn.textContent = "🔄 Scan Network";
+        btn.disabled = false;
+        scanning = false;
+      }
     }
 
+    // Display real devices
     function displayDevices(devices) {
       deviceList.innerHTML = "";
       devices.forEach(device => {
         const li = document.createElement("li");
         li.className = "device";
         li.innerHTML = `
-          <strong>${device.ip}</strong> | ${device.mac} | ${device.vendor}
-          ${device.openPorts?.length ? `<span class="vuln"> ⚠️ ${device.openPorts.length} ports</span>` : ''}
+          <strong>${device.ip}</strong><br>
+          MAC: ${device.mac}<br>
+          Vendor: ${device.vendor}
+          ${device.openPorts?.length ? `<span class="vuln"> ⚠️ Open ports detected</span>` : ''}
         `;
         deviceList.appendChild(li);
       });
-      scanning = false;
     }
 
+    // Real topology visualization
     function drawTopology(nodes, edges) {
-      const container = document.getElementById("network");
       const data = { 
         nodes: new vis.DataSet(nodes), 
         edges: new vis.DataSet(edges) 
@@ -202,18 +216,37 @@
         nodes: {
           shape: "dot",
           color: { background: "#007bff", border: "#ffffff" },
-          font: { color: "white", size: 12 }
+          font: { color: "white", size: 12 },
+          size: 20
         },
         edges: {
           arrows: 'to',
           color: "#00ff42",
+          width: 2,
           smooth: false
         },
-        physics: { enabled: true, stabilization: { iterations: 100 } }
+        physics: { 
+          enabled: true, 
+          stabilization: { iterations: 100 },
+          barnesHut: { gravitationalConstant: -8000 }
+        }
       };
-      new vis.Network(container, data, options);
+      new vis.Network(networkDiv, data, options);
     }
 
+    // Live packet streaming
+    async function streamPackets() {
+      try {
+        const response = await fetch('/api/packets');
+        const packets = await response.text();
+        logContainer.innerHTML += packets;
+        logContainer.scrollTop = logContainer.scrollHeight;
+      } catch(e) {
+        // Silent fail for packet stream
+      }
+    }
+
+    // Network info
     function displayWifiInfo() {
       if (navigator.connection) {
         const conn = navigator.connection;
@@ -221,13 +254,20 @@
           <strong>🔗 Type:</strong> ${conn.effectiveType}<br>
           <strong>📡 Speed:</strong> ${conn.downlink} Mbps<br>
           <strong>⏱️ RTT:</strong> ${conn.rtt} ms<br>
-          <strong>💾 SaveData:</strong> ${conn.saveData ? "Yes" : "No"}
+          <strong>💾 SaveData:</strong> ${conn.saveData ? "Enabled" : "Disabled"}
         `;
+      } else {
+        wifiInfo.innerHTML = "Network APIs unavailable";
       }
     }
 
+    // Initialize
+    log("🔌 Network Inspector loaded");
     displayWifiInfo();
+    
+    // Auto-refresh
     setInterval(displayWifiInfo, 5000);
+    setInterval(streamPackets, 3000);
   </script>
 </body>
 </html>
