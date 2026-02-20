@@ -1,0 +1,233 @@
+  <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Network Inspector</title>
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(rgba(0,0,0,0.7), rgba(0,0,0,0.7)), url('ca63eccfcf11bcd02c1a900196de630f_720w.mp4') no-repeat center center fixed;
+      background-size: cover;
+      margin: 0;
+      padding: 0;
+      color: #333;
+      overflow-x: hidden;
+    }
+
+    header, footer {
+      background: #000000;
+      color: rgb(0, 255, 42);
+      text-align: center;
+      padding: 20px 10px;
+      box-shadow: 0 0 20px rgba(0,255,42,0.3);
+    }
+
+    main {
+      display: flex;
+      flex-wrap: wrap;
+      padding: 20px;
+      gap: 20px;
+      justify-content: space-around;
+    }
+
+    section {
+      background: rgba(255,255,255,0.95);
+      padding: 20px;
+      border-radius: 8px;
+      flex: 1 1 45%;
+      box-shadow: 0 4px 20px rgba(0,255,42,0.2);
+      border: 1px solid rgba(0,255,42,0.3);
+    }
+
+    #network {
+      width: 100%;
+      height: 400px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    #log-container {
+      height: 400px;
+      overflow-y: auto;
+      background: #000;
+      color: #0f0;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 14px;
+      border: 1px solid #333;
+      border-radius: 4px;
+    }
+
+    #device-list {
+      list-style: none;
+      padding-left: 0;
+      font-family: monospace;
+      font-size: 14px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .device {
+      margin: 4px 0;
+      border-bottom: 1px dashed #ccc;
+      padding: 5px;
+      transition: all 0.3s;
+    }
+
+    .device:hover {
+      background: rgba(0,255,42,0.1);
+    }
+
+    .vuln {
+      color: red;
+      font-weight: bold;
+    }
+
+    button {
+      margin-bottom: 10px;
+      padding: 6px 12px;
+      background: #ff0000;
+      color: rgb(0, 255, 85);
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+
+    button:hover {
+      background: #cc0000;
+      box-shadow: 0 0 10px rgba(255,0,0,0.5);
+    }
+
+    h1, h2 {
+      text-shadow: 0 0 10px rgba(0,255,42,0.5);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🔍 Network Inspector Dashboard</h1>
+    <p>Real-time Network Analysis & Security Monitoring</p>
+  </header>
+
+  <main>
+    <section>
+      <h2>📡 Connected Devices</h2>
+      <button onclick="fetchDevices()">🔄 Scan Network</button>
+      <ul id="device-list"></ul>
+    </section>
+
+    <section>
+      <h2>📊 Live Network Activity</h2>
+      <div id="log-container">[ Connected to backend... ]</div>
+    </section>
+
+    <section>
+      <h2>🌐 Network Topology</h2>
+      <div id="network"></div>
+    </section>
+
+    <section>
+      <h2>📶 Current Connection</h2>
+      <div id="wifi-info">Loading network details...</div>
+    </section>
+  </main>
+
+  <footer>
+    <p>© 2025 Network Inspector | Powered by Vercel Backend</p>
+  </footer>
+
+  <script>
+    const socket = io();
+    const logContainer = document.getElementById("log-container");
+    const deviceList = document.getElementById("device-list");
+    const wifiInfo = document.getElementById("wifi-info");
+    let scanning = false;
+
+    socket.on("connect", () => {
+      logContainer.innerHTML += `<div>[${new Date().toLocaleTimeString()}] ✅ Connected to Network Inspector Backend</div>`;
+      logContainer.scrollTop = logContainer.scrollHeight;
+    });
+
+    socket.on("packet", (data) => {
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement("div");
+      entry.textContent = `[${time}] ${data}`;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    });
+
+    socket.on("devices", (devices) => {
+      displayDevices(devices);
+    });
+
+    socket.on("topology", (topology) => {
+      drawTopology(topology.nodes, topology.edges);
+    });
+
+    async function fetchDevices() {
+      if (scanning) return;
+      scanning = true;
+      const btn = event.target;
+      btn.textContent = "⏳ Scanning...";
+      btn.disabled = true;
+      
+      socket.emit("scan-network");
+    }
+
+    function displayDevices(devices) {
+      deviceList.innerHTML = "";
+      devices.forEach(device => {
+        const li = document.createElement("li");
+        li.className = "device";
+        li.innerHTML = `
+          <strong>${device.ip}</strong> | ${device.mac} | ${device.vendor}
+          ${device.openPorts?.length ? `<span class="vuln"> ⚠️ ${device.openPorts.length} ports</span>` : ''}
+        `;
+        deviceList.appendChild(li);
+      });
+      scanning = false;
+    }
+
+    function drawTopology(nodes, edges) {
+      const container = document.getElementById("network");
+      const data = { 
+        nodes: new vis.DataSet(nodes), 
+        edges: new vis.DataSet(edges) 
+      };
+      const options = {
+        nodes: {
+          shape: "dot",
+          color: { background: "#007bff", border: "#ffffff" },
+          font: { color: "white", size: 12 }
+        },
+        edges: {
+          arrows: 'to',
+          color: "#00ff42",
+          smooth: false
+        },
+        physics: { enabled: true, stabilization: { iterations: 100 } }
+      };
+      new vis.Network(container, data, options);
+    }
+
+    function displayWifiInfo() {
+      if (navigator.connection) {
+        const conn = navigator.connection;
+        wifiInfo.innerHTML = `
+          <strong>🔗 Type:</strong> ${conn.effectiveType}<br>
+          <strong>📡 Speed:</strong> ${conn.downlink} Mbps<br>
+          <strong>⏱️ RTT:</strong> ${conn.rtt} ms<br>
+          <strong>💾 SaveData:</strong> ${conn.saveData ? "Yes" : "No"}
+        `;
+      }
+    }
+
+    displayWifiInfo();
+    setInterval(displayWifiInfo, 5000);
+  </script>
+</body>
+</html>
