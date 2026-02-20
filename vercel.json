@@ -1,10 +1,15 @@
-{
-  "name": "network-inspector",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "vercel dev"
-  },
-  "dependencies": {
-    "socket.io": "^4.7.4"
-  }
+  {
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/index.js"
+    }
+  ]
 }
